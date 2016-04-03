@@ -1,195 +1,187 @@
-import org.apache.commons.lang.ArrayUtils;
-
-import java.lang.reflect.Array;
 import java.util.*;
 
 /**
- * Created by Matus on 30.03.2016.
+ * Date 11/17/2015
+ * @author Tushar Roy
+ *
+ * Help Karp method of finding tour of traveling salesman.
+ *
+ * Time complexity - O(2^n * n^2)
+ * Space complexity - O(2^n)
+ *
+ * https://en.wikipedia.org/wiki/Held%E2%80%93Karp_algorithm
  */
 public class HeldKarp {
 
-    private int[][] matrix;
-    private int[] firstLine;
-    private int distance;
-    private List<Integer> visitedCities = new ArrayList<Integer>();
+    private static int INFINITY = 100000000;
 
-    public HeldKarp(int[][]matrix){
-        this.matrix = matrix;
-        firstLine = new int[matrix.length];
-        for(int i=0;i<matrix.length;i++){
-            firstLine[i] = matrix[0][i];
+    private static class Index {
+        int currentVertex;
+        Set<Integer> vertexSet;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Index index = (Index) o;
+
+            if (currentVertex != index.currentVertex) return false;
+            return !(vertexSet != null ? !vertexSet.equals(index.vertexSet) : index.vertexSet != null);
         }
-        visitedCities.add(0);
+
+        @Override
+        public int hashCode() {
+            int result = currentVertex;
+            result = 31 * result + (vertexSet != null ? vertexSet.hashCode() : 0);
+            return result;
+        }
+
+        private static Index createIndex(int vertex, Set<Integer> vertexSet) {
+            Index i = new Index();
+            i.currentVertex = vertex;
+            i.vertexSet = vertexSet;
+            return i;
+        }
     }
 
-    public void findPath(){
+    private static class SetSizeComparator implements Comparator<Set<Integer>>{
+        @Override
+        public int compare(Set<Integer> o1, Set<Integer> o2) {
+//            if(o1.size() <= o2.size()) {
+//                return -1;
+//            } else {
+//                return 1;
+//            }
+            return Integer.valueOf(o1.size()).compareTo(o2.size());
+        }
+    }
 
-        List<Integer> path = new ArrayList<Integer>();
-        List<Integer> list = new ArrayList<Integer>();
-        List<Integer> distances = new ArrayList<Integer>();
-        ArrayList<Integer> copyOfList = new ArrayList<Integer>();
-        List<Integer> copyListTemp = new ArrayList<Integer>();
-        ArrayList<ArrayList<Integer>> perm= new ArrayList<ArrayList<Integer>>();
+    public int minDistance(int[][] distance) {
 
-        for(int g=0; g<matrix.length; g++) {
-            if(g==0) {
-                for (int s = 1; s < matrix.length; s++) {
-                    for (int j = 1; j < matrix.length; j++) {
-                        if (s != j) {
-                            list.add(j);
-                            if (copyOfList.size() > 1) {
-                                copyOfList.set(g, j);
-                            } else {
-                                copyOfList.add(g, j);
-                            }
-                            copyListTemp.addAll(copyOfList);
+        //stores intermediate values in map
+        Map<Index, Integer> minCostDP = new HashMap<>();
+        Map<Index, Integer> parent = new HashMap<>();
 
-                            perm = permutations(copyOfList);
-                            if (g < 1) {
-                                if (copyOfList.size() == 0) {
-                                    copyOfList.addAll(copyListTemp);
-                                }
-                                g(s, copyOfList);
-                                distances.add(getDistance());
-                                setDistance(0);
-                            } else {
-                                for (int t = 0; t < perm.size(); t++) {
-                                    if (copyOfList.size() == 0) {
-                                        copyOfList.addAll(copyListTemp);
-                                    }
-                                    g(s, perm.get(t));
-                                    distances.add(getDistance());
-                                    setDistance(0);
-                                }
-                            }
-                            System.out.println(distance);
-                            copyListTemp.clear();
+        List<Set<Integer>> allSets = generateCombination(distance.length-1);
+        long startTime = System.currentTimeMillis();
+        System.out.println("start");
+        long endTime = startTime + 10 * 1000;
+        while(System.currentTimeMillis() < endTime) {
+            for(Set<Integer> set : allSets) {
+                System.out.println("set"+set.size());
+                for (int currentVertex = 1; currentVertex < distance.length; currentVertex++) {
+                    if (set.contains(currentVertex)) {
+                        continue;
+                    }
+                    Index index = Index.createIndex(currentVertex, set);
+                    int minCost = INFINITY;
+                    int minPrevVertex = 0;
+                    //to avoid ConcurrentModificationException copy set into another set while iterating
+                    Set<Integer> copySet = new HashSet<>(set);
+                    for (int prevVertex : set) {
+                        int cost = distance[prevVertex][currentVertex] + getCost(copySet, prevVertex, minCostDP);
+                        if (cost < minCost) {
+                            minCost = cost;
+                            minPrevVertex = prevVertex;
                         }
                     }
+                    //this happens for empty subset
+                    if (set.size() == 0) {
+                        minCost = distance[0][currentVertex];
+                    }
+                    minCostDP.put(index, minCost);
+                    parent.put(index, minPrevVertex);
                 }
-            }
-            path.add(g, Collections.min(distances));
-            for(int indexOfMinimum=0;indexOfMinimum<distances.size();indexOfMinimum++){
-                if(distances.get(indexOfMinimum) == path.get(g)) {
-                    copyOfList.add(list.get(indexOfMinimum));
-                    visitedCities.add(list.get(indexOfMinimum+1));
-                    visitedCities.add(list.get(indexOfMinimum));
-                    break;
-                }
-            }
-            distances.clear();
-
-        }
-    }
-
-    public void g(int index1, List<Integer> index2){
-
-        int temp = 0;
-//        List<Integer> index2 = new ArrayList<Integer>();
-//        for(int k=0;k<index2List.size();k++){
-//            index2.add(k, index2List.get(k));
-//        }
-        int swap=0;
-        if(index2.size() == 0){
-            distance += firstLine[index1];
-        }
-        else{
-            for(int i=0 ;i<index2.size();i++){
-                temp = index2.get(0);
-                if(index2.size()<=1) {
-                    index2.remove(0);
-                    setDistance(getDistance() + matrix[index1][temp]);
-                    g(temp, index2);
-                }
-                else{
-                    setDistance(getDistance() + matrix[index1][temp]);
-                    temp=index2.get(0);
-                    index2.remove(0);
-                    g(temp, index2);
-//                    swap=index2.get(i);
-//                    index2.set(i, index2.get(i+1));
-//                    index2.set(i+1, swap);
-//                    temp = index2.get(i);
-
-                }
-
-            }
-
-        }
-//        return distance;
-    }
-
-    private List<Integer> permute(java.util.List<Integer> arr, int k){
-        List<ArrayList<Integer>> permutations = new ArrayList<ArrayList<Integer>>();
-        List<Integer> inner = new ArrayList<Integer>();
-        for(int i = k; i < arr.size(); i++){
-            java.util.Collections.swap(arr, i, k);
-            inner.addAll(arr);
-            permutations.add((ArrayList) inner);
-            permute(arr, k + 1);
-            java.util.Collections.swap(arr, k, i);
-
-        }
-        if (k == arr.size() -1){
-            System.out.println(java.util.Arrays.toString(arr.toArray()));
-        }
-        return arr;
-    }
-
-    private ArrayList<ArrayList<Integer>> permutations(ArrayList<Integer> input) {
-
-        ArrayList<ArrayList<Integer>> permutations = new ArrayList<ArrayList<Integer>>();
-
-        if (input.size() == 0) {
-            permutations.add(new ArrayList<Integer>());
-            return permutations;
-        }
-
-        Integer firstElement = input.remove(0);
-
-        ArrayList<ArrayList<Integer>> recursiveReturn = permutations(input);
-        for (ArrayList<Integer> li : recursiveReturn) {
-
-            for (int index = 0; index <= li.size(); index++) {
-                ArrayList<Integer> temp = new ArrayList<Integer>(li);
-                temp.add(index, firstElement);
-                permutations.add(temp);
-            }
-
-        }
-        return permutations;
-    }
-
-
-    public void g1(int index1, List<Integer> index2) {
-
-        int temp = 0;
-        int swap=0;
-        if(index2.size() == 0){
-            distance += firstLine[index1];
-        }
-        else{
-            for(int i=1;i<index2.size();i++){
-                setDistance(getDistance()+matrix[index1][index2.get(i-1)]);
-//                setDistance(getDistance()+matrix[]);
+//            }
+//            else{
+//                break;
             }
         }
+
+        System.out.println("end");
+        Set<Integer> set = new HashSet<>();
+        for(int i=1; i < distance.length; i++) {
+            set.add(i);
+        }
+        int min = Integer.MAX_VALUE;
+        int prevVertex = -1;
+        //to avoid ConcurrentModificationException copy set into another set while iterating
+        Set<Integer> copySet = new HashSet<>(set);
+        for(int k : set) {
+            int cost = distance[k][0] + getCost(copySet, k, minCostDP);
+            if(cost < min) {
+                min = cost;
+                prevVertex = k;
+            }
+        }
+
+        parent.put(Index.createIndex(0, set), prevVertex);
+        writePath(parent, distance.length);
+        return min;
     }
 
-    private int setMinimum(int rowIndex){
-
-        int minimum;
-        List list = Arrays.asList(ArrayUtils.toObject(matrix[rowIndex]));
-        minimum = (int) Collections.min(list);
-
-        return minimum;
+    private void writePath(Map<Index, Integer> parent, int totalVertices) {
+        Set<Integer> set = new HashSet<>();
+        for(int i=0; i < totalVertices; i++) {
+            set.add(i);
+        }
+        Integer start = 0;
+        Deque<Integer> stack = new LinkedList<>();
+        while(true) {
+            stack.push(start);
+            set.remove(start);
+            start = parent.get(Index.createIndex(start, set));
+            if(start == null) {
+                break;
+            }
+        }
+        StringJoiner joiner = new StringJoiner("->");
+        stack.forEach(v -> joiner.add(String.valueOf(v)));
+        System.out.println("\nTSP tour");
+        System.out.println(joiner.toString());
     }
 
-    public int getDistance() {
-        return distance;
+    private int getCost(Set<Integer> set, int prevVertex, Map<Index, Integer> minCostDP) {
+        set.remove(prevVertex);
+        Index index = Index.createIndex(prevVertex, set);
+        int cost = minCostDP.get(index);
+        set.add(prevVertex);
+        return cost;
     }
 
-    public void setDistance(int distance) {
-        this.distance = distance;
+    private List<Set<Integer>> generateCombination(int n) {
+        int input[] = new int[n];
+        for(int i = 0; i < input.length; i++) {
+            input[i] = i+1;
+        }
+        List<Set<Integer>> allSets = new ArrayList<>();
+        int result[] = new int[input.length];
+        generateCombination(input, 0, 0, allSets, result);
+        Collections.sort(allSets, new SetSizeComparator());
+        return allSets;
+    }
+
+    private void generateCombination(int input[], int start, int pos, List<Set<Integer>> allSets, int result[]) {
+        if(pos == input.length) {
+            return;
+        }
+        Set<Integer> set = createSet(result, pos);
+        allSets.add(set);
+        for(int i=start; i < input.length; i++) {
+            result[pos] = input[i];
+            generateCombination(input, i+1, pos+1, allSets, result);
+        }
+    }
+
+    private static Set<Integer> createSet(int input[], int pos) {
+        if(pos == 0) {
+            return new HashSet<>();
+        }
+        Set<Integer> set = new HashSet<>();
+        for(int i = 0; i < pos; i++) {
+            set.add(input[i]);
+        }
+        return set;
     }
 }
