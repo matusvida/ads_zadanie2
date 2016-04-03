@@ -48,11 +48,12 @@ public class TravelingSalesmanHeldKarp {
     private static class SetSizeComparator implements Comparator<Set<Integer>>{
         @Override
         public int compare(Set<Integer> o1, Set<Integer> o2) {
-            if(o1.size() <= o2.size()) {
-                return -1;
-            } else {
-                return 1;
-            }
+//            if(o1.size() <= o2.size()) {
+//                return -1;
+//            } else {
+//                return 1;
+//            }
+            return Integer.valueOf(o1.size()).compareTo(o2.size());
         }
     }
 
@@ -62,34 +63,42 @@ public class TravelingSalesmanHeldKarp {
         Map<Index, Integer> minCostDP = new HashMap<>();
         Map<Index, Integer> parent = new HashMap<>();
 
-        List<Set<Integer>> allSets = generateCombination(distance.length - 1);
-
-        for(Set<Integer> set : allSets) {
-            for(int currentVertex = 1; currentVertex < distance.length; currentVertex++) {
-                if(set.contains(currentVertex)) {
-                    continue;
-                }
-                Index index = Index.createIndex(currentVertex, set);
-                int minCost = INFINITY;
-                int minPrevVertex = 0;
-                //to avoid ConcurrentModificationException copy set into another set while iterating
-                Set<Integer> copySet = new HashSet<>(set);
-                for(int prevVertex : set) {
-                    int cost = distance[prevVertex][currentVertex] + getCost(copySet, prevVertex, minCostDP);
-                    if(cost < minCost) {
-                        minCost = cost;
-                        minPrevVertex = prevVertex;
+        List<Set<Integer>> allSets = generateCombination(distance.length-1);
+        long startTime = System.currentTimeMillis();
+        System.out.println("start");
+        long endTime = startTime + 10 * 1000;
+        while(System.currentTimeMillis() < endTime) {
+            for(Set<Integer> set : allSets) {
+                for (int currentVertex = 1; currentVertex < distance.length; currentVertex++) {
+                    if (set.contains(currentVertex)) {
+                        continue;
                     }
+                    Index index = Index.createIndex(currentVertex, set);
+                    int minCost = INFINITY;
+                    int minPrevVertex = 0;
+                    //to avoid ConcurrentModificationException copy set into another set while iterating
+                    Set<Integer> copySet = new HashSet<>(set);
+                    for (int prevVertex : set) {
+                        int cost = distance[prevVertex][currentVertex] + getCost(copySet, prevVertex, minCostDP);
+                        if (cost < minCost) {
+                            minCost = cost;
+                            minPrevVertex = prevVertex;
+                        }
+                    }
+                    //this happens for empty subset
+                    if (set.size() == 0) {
+                        minCost = distance[0][currentVertex];
+                    }
+                    minCostDP.put(index, minCost);
+                    parent.put(index, minPrevVertex);
                 }
-                //this happens for empty subset
-                if(set.size() == 0) {
-                    minCost = distance[0][currentVertex];
-                }
-                minCostDP.put(index, minCost);
-                parent.put(index, minPrevVertex);
+//            }
+//            else{
+//                break;
             }
         }
 
+        System.out.println("end");
         Set<Integer> set = new HashSet<>();
         for(int i=1; i < distance.length; i++) {
             set.add(i);
@@ -174,17 +183,4 @@ public class TravelingSalesmanHeldKarp {
         }
         return set;
     }
-
-//    public static void main(String args[]) {
-//
-//        TravelingSalesmanHeldKarp ht = new TravelingSalesmanHeldKarp();
-//        int distance[][] = {{0, 1, 15, 6},
-//                {2, 0, 7, 3},
-//                {9, 6, 0, 12},
-//                {10, 4, 8, 0},
-//        };
-//
-//        int minCost = ht.minCost(distance);
-//        System.out.println("Min cost is " + minCost);
-//    }
 }
